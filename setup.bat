@@ -1,9 +1,9 @@
 @echo off
 echo Creating virtual environment...
-python -m venv .venv
+python -m virtualenv venv
 
 echo Activating virtual environment...
-call .venv\Scripts\activate.bat
+call venv\Scripts\activate.bat
 
 echo Installing dependencies...
 python -m pip install --upgrade pip
