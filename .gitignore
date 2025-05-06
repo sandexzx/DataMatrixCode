@@ -1,0 +1,4 @@
+datamatrix_codes/
+output.txt
+.venv/
+*.xlsx
