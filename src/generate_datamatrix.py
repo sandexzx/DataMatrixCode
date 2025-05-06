@@ -15,6 +15,37 @@ from rich.panel import Panel
 from rich import print as rprint
 from rich.style import Style
 from rich.text import Text
+import glob
+
+def find_excel_file():
+    """Находит единственный Excel файл в текущей директории"""
+    excel_files = glob.glob('*.xlsx')
+    if len(excel_files) == 0:
+        raise FileNotFoundError("Excel файл не найден в текущей директории")
+    if len(excel_files) > 1:
+        raise ValueError(f"Найдено несколько Excel файлов: {', '.join(excel_files)}. Оставьте только один файл.")
+    return excel_files[0]
+
+# Конфигурация
+CONFIG = {
+    # Путь к Excel файлу будет определен динамически
+    'EXCEL_FILE': None,  # Будет установлено при запуске
+    
+    # Настройки PDF
+    'PDF': {
+        'PAGE_SIZE': (15 * cm, 15 * cm),  # Размер страницы
+        'OUTPUT_FILENAME': 'datamatrix_codes.pdf',
+        'BOX_SIZE': 14 * cm,  # Размер области для кода
+        'TEXT_OFFSET': 0.2 * cm,  # Отступ текста от кода
+        'FONT_SIZE': 30,  # Размер шрифта для подписи
+        'FONT_NAME': 'Helvetica'
+    },
+    
+    # Настройки DataMatrix
+    'DATAMATRIX': {
+        'SCALE_FACTOR': 5  # Множитель для увеличения размера кода
+    }
+}
 
 # Инициализируем консоль rich
 console = Console()
@@ -27,7 +58,7 @@ def extract_codes_from_excel():
             warnings.simplefilter("ignore")
             # Читаем Excel файл
             df = pd.read_excel(
-                'src/file-181f58e4-fa35-446d-9ebb-e75dcd0c726d.xlsx',
+                CONFIG['EXCEL_FILE'],
                 skiprows=1,
                 dtype=str,  # Читаем все колонки как строки
                 na_filter=False,  # Не интерпретируем пустые ячейки как NaN
@@ -51,14 +82,14 @@ def generate_datamatrix(code):
     img = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
     
     # Увеличиваем размер изображения
-    img = img.resize((encoded.width * 5, encoded.height * 5), Image.Resampling.NEAREST)
+    img = img.resize((encoded.width * CONFIG['DATAMATRIX']['SCALE_FACTOR'], encoded.height * CONFIG['DATAMATRIX']['SCALE_FACTOR']), Image.Resampling.NEAREST)
     
     return img
 
-def create_pdf_with_codes(codes, label, output_filename='datamatrix_codes.pdf'):
+def create_pdf_with_codes(codes, label, output_filename=CONFIG['PDF']['OUTPUT_FILENAME']):
     """Создает PDF файл с Data Matrix кодами на отдельных страницах"""
-    # Создаем размер страницы 15x15 см
-    page_size = (15 * cm, 15 * cm)
+    # Создаем размер страницы
+    page_size = CONFIG['PDF']['PAGE_SIZE']
     
     # Создаем PDF canvas с пользовательским размером страницы
     c = canvas.Canvas(output_filename, pagesize=page_size)
@@ -67,7 +98,7 @@ def create_pdf_with_codes(codes, label, output_filename='datamatrix_codes.pdf'):
     # Вычисляем центральную позицию
     center_x = width / 2
     center_y = height / 2
-    box_size = 14 * cm  # Немного меньше страницы, чтобы был отступ
+    box_size = CONFIG['PDF']['BOX_SIZE']  # Немного меньше страницы, чтобы был отступ
     
     total_codes = len(codes)
     console.print("\n[bold blue]Начинаем генерацию PDF...")
@@ -119,9 +150,9 @@ def create_pdf_with_codes(codes, label, output_filename='datamatrix_codes.pdf'):
                 c.drawImage(temp_filename, x, y, width=scaled_width, height=scaled_height)
                 
                 # Добавляем текст под кодом
-                text_y = y - 0.2 * cm  # Уменьшаем отступ от кода до текста
-                c.setFont("Helvetica", 30)  # Уменьшаем размер шрифта
-                text_width = c.stringWidth(label, "Helvetica", 30)
+                text_y = y - CONFIG['PDF']['TEXT_OFFSET']
+                c.setFont(CONFIG['PDF']['FONT_NAME'], CONFIG['PDF']['FONT_SIZE'])
+                text_width = c.stringWidth(label, CONFIG['PDF']['FONT_NAME'], CONFIG['PDF']['FONT_SIZE'])
                 c.drawString(center_x - text_width/2, text_y, label)
                 
                 # Удаляем временный файл
@@ -145,18 +176,27 @@ def create_pdf_with_codes(codes, label, output_filename='datamatrix_codes.pdf'):
     ))
 
 def main():
-    # Запрашиваем текст для подписи
-    label = console.input("[bold yellow]Введите текст для подписи под кодом (например, 06.25/255): ")
-    
-    # Шаг 1: Извлекаем коды из Excel
-    codes = extract_codes_from_excel()
-    
-    # Шаг 2: Генерируем PDF с кодами
-    if codes:
-        create_pdf_with_codes(codes, label)
-        console.print("\n[bold green]Процесс успешно завершен!")
-    else:
-        console.print("[bold red]Коды не были извлечены. Генерация PDF невозможна.")
+    try:
+        # Определяем путь к Excel файлу
+        CONFIG['EXCEL_FILE'] = find_excel_file()
+        console.print(f"[bold green]Найден Excel файл: {CONFIG['EXCEL_FILE']}")
+        
+        # Запрашиваем текст для подписи
+        label = console.input("[bold yellow]Введите текст для подписи под кодом (например, 06.25/255): ")
+        
+        # Шаг 1: Извлекаем коды из Excel
+        codes = extract_codes_from_excel()
+        
+        # Шаг 2: Генерируем PDF с кодами
+        if codes:
+            create_pdf_with_codes(codes, label)
+            console.print("\n[bold green]Процесс успешно завершен!")
+        else:
+            console.print("[bold red]Коды не были извлечены. Генерация PDF невозможна.")
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[bold red]Ошибка: {str(e)}")
+    except Exception as e:
+        console.print(f"[bold red]Произошла непредвиденная ошибка: {str(e)}")
 
 if __name__ == "__main__":
     main() 
