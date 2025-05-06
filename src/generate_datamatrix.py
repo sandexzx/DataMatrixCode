@@ -4,7 +4,7 @@ from pylibdmtx.pylibdmtx import encode
 from PIL import Image
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
+from reportlab.lib.units import cm, mm
 from io import BytesIO
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -33,17 +33,28 @@ CONFIG = {
     
     # Настройки PDF
     'PDF': {
-        'PAGE_SIZE': (15 * cm, 15 * cm),  # Размер страницы
+        'PAGE_SIZE_CM': (15 * cm, 15 * cm),  # Размер страницы в сантиметрах
+        'PAGE_SIZE_MM': (15 * mm, 15 * mm),  # Размер страницы в миллиметрах
         'OUTPUT_FILENAME': 'datamatrix_codes.pdf',
-        'BOX_SIZE': 14 * cm,  # Размер области для кода
-        'TEXT_OFFSET': 0.2 * cm,  # Отступ текста от кода
-        'FONT_SIZE': 30,  # Размер шрифта для подписи
-        'FONT_NAME': 'Helvetica'
+        'BOX_SIZE_CM': 14 * cm,  # Размер области для кода в сантиметрах
+        'BOX_SIZE_MM': 13 * mm,  # Размер области для кода в миллиметрах
+        'TEXT_OFFSET_CM': 0.08 * cm,  # Отступ текста от кода в сантиметрах
+        'TEXT_OFFSET_MM': 0.5 * mm,  # Отступ текста от кода в миллиметрах
+        'FONT_SIZE_CM': 39,  # Размер шрифта для подписи в сантиметрах
+        'FONT_SIZE_MM': 5,  # Размер шрифта для подписи в миллиметрах
+        'FONT_NAME': 'Helvetica',
+        'USE_MM': False  # Флаг для переключения между мм и см
     },
     
     # Настройки DataMatrix
     'DATAMATRIX': {
         'SCALE_FACTOR': 5  # Множитель для увеличения размера кода
+    },
+
+    # Настройки отладки
+    'DEBUG': {
+        'ENABLED': True,  # Флаг режима отладки
+        'MAX_PAGES': 5    # Максимальное количество страниц в режиме отладки
     }
 }
 
@@ -88,8 +99,17 @@ def generate_datamatrix(code):
 
 def create_pdf_with_codes(codes, label, output_filename=CONFIG['PDF']['OUTPUT_FILENAME']):
     """Создает PDF файл с Data Matrix кодами на отдельных страницах"""
-    # Создаем размер страницы
-    page_size = CONFIG['PDF']['PAGE_SIZE']
+    # Выбираем размеры в зависимости от режима
+    if CONFIG['PDF']['USE_MM']:
+        page_size = CONFIG['PDF']['PAGE_SIZE_MM']
+        box_size = CONFIG['PDF']['BOX_SIZE_MM']
+        text_offset = CONFIG['PDF']['TEXT_OFFSET_MM']
+        font_size = CONFIG['PDF']['FONT_SIZE_MM']
+    else:
+        page_size = CONFIG['PDF']['PAGE_SIZE_CM']
+        box_size = CONFIG['PDF']['BOX_SIZE_CM']
+        text_offset = CONFIG['PDF']['TEXT_OFFSET_CM']
+        font_size = CONFIG['PDF']['FONT_SIZE_CM']
     
     # Создаем PDF canvas с пользовательским размером страницы
     c = canvas.Canvas(output_filename, pagesize=page_size)
@@ -98,7 +118,6 @@ def create_pdf_with_codes(codes, label, output_filename=CONFIG['PDF']['OUTPUT_FI
     # Вычисляем центральную позицию
     center_x = width / 2
     center_y = height / 2
-    box_size = CONFIG['PDF']['BOX_SIZE']  # Немного меньше страницы, чтобы был отступ
     
     total_codes = len(codes)
     console.print("\n[bold blue]Начинаем генерацию PDF...")
@@ -150,9 +169,9 @@ def create_pdf_with_codes(codes, label, output_filename=CONFIG['PDF']['OUTPUT_FI
                 c.drawImage(temp_filename, x, y, width=scaled_width, height=scaled_height)
                 
                 # Добавляем текст под кодом
-                text_y = y - CONFIG['PDF']['TEXT_OFFSET']
-                c.setFont(CONFIG['PDF']['FONT_NAME'], CONFIG['PDF']['FONT_SIZE'])
-                text_width = c.stringWidth(label, CONFIG['PDF']['FONT_NAME'], CONFIG['PDF']['FONT_SIZE'])
+                text_y = y - text_offset
+                c.setFont(CONFIG['PDF']['FONT_NAME'], font_size)
+                text_width = c.stringWidth(label, CONFIG['PDF']['FONT_NAME'], font_size)
                 c.drawString(center_x - text_width/2, text_y, label)
                 
                 # Удаляем временный файл
@@ -181,11 +200,20 @@ def main():
         CONFIG['EXCEL_FILE'] = find_excel_file()
         console.print(f"[bold green]Найден Excel файл: {CONFIG['EXCEL_FILE']}")
         
+        # Запрашиваем размер страницы
+        size_choice = console.input("[bold yellow]Выберите размер страницы (1 - 15x15 см, 2 - 15x15 мм): ")
+        CONFIG['PDF']['USE_MM'] = size_choice == '2'
+        
         # Запрашиваем текст для подписи
         label = console.input("[bold yellow]Введите текст для подписи под кодом (например, 06.25/255): ")
         
         # Шаг 1: Извлекаем коды из Excel
         codes = extract_codes_from_excel()
+        
+        # В режиме отладки ограничиваем количество кодов
+        if CONFIG['DEBUG']['ENABLED']:
+            codes = codes[:CONFIG['DEBUG']['MAX_PAGES']]
+            console.print(f"[bold yellow]Режим отладки: будет сгенерировано {len(codes)} страниц")
         
         # Шаг 2: Генерируем PDF с кодами
         if codes:
