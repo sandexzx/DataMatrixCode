@@ -1,6 +1,6 @@
 @echo off
 echo Activating virtual environment...
-call .venv\Scripts\activate.bat
+call venv\Scripts\activate.bat
 
 echo Running the script...
 python src/generate_datamatrix.py
