@@ -3,7 +3,7 @@ echo Activating virtual environment...
 call .venv\Scripts\activate.bat
 
 echo Running the script...
-python src/process_codes.py
+python src/generate_datamatrix.py
 
 echo.
 echo Process completed!

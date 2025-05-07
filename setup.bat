@@ -17,12 +17,16 @@ echo Checking virtualenv...
 python -m pip show virtualenv >nul 2>&1
 if %errorlevel% neq 0 (
     echo Installing virtualenv...
-    python -m pip install virtualenv
+    python -m pip install virtualenv --user
     if %errorlevel% neq 0 (
         echo Error: Failed to install virtualenv
         pause
         exit /b 1
     )
+    
+    :: Add user's Python Scripts directory to PATH
+    for /f "tokens=*" %%i in ('python -c "import site; print(site.getusersitepackages().replace('Lib\\site-packages', 'Scripts'))"') do set USER_SCRIPTS=%%i
+    set "PATH=!USER_SCRIPTS!;!PATH!"
 )
 
 echo Creating virtual environment...
