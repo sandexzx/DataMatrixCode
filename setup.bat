@@ -65,6 +65,31 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+echo Installing libdmtx DLL...
+powershell -Command "& {Invoke-WebRequest -Uri 'https://github.com/dmtx/libdmtx/releases/download/v0.1.10/libdmtx-0.1.10-win64.zip' -OutFile 'libdmtx.zip'}"
+if %errorlevel% neq 0 (
+    echo Error: Failed to download libdmtx
+    pause
+    exit /b 1
+)
+
+powershell -Command "& {Expand-Archive -Path 'libdmtx.zip' -DestinationPath 'temp_libdmtx' -Force}"
+if %errorlevel% neq 0 (
+    echo Error: Failed to extract libdmtx
+    pause
+    exit /b 1
+)
+
+copy "temp_libdmtx\libdmtx-64.dll" "venv\Lib\site-packages\pylibdmtx\"
+if %errorlevel% neq 0 (
+    echo Error: Failed to copy DLL file
+    pause
+    exit /b 1
+)
+
+rmdir /s /q temp_libdmtx
+del libdmtx.zip
+
 echo.
 echo Setup completed successfully!
 echo You can now run the script using run.bat
