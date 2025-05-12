@@ -66,29 +66,51 @@ if %errorlevel% neq 0 (
 )
 
 echo Installing libdmtx DLL...
-powershell -Command "& {Invoke-WebRequest -Uri 'https://github.com/dmtx/libdmtx/releases/download/v0.1.10/libdmtx-0.1.10-win64.zip' -OutFile 'libdmtx.zip'}"
+set "DLL_URL=https://github.com/dmtx/libdmtx/releases/download/v0.1.10/libdmtx-0.1.10-win64.zip"
+set "DLL_FILE=libdmtx.zip"
+set "TEMP_DIR=temp_libdmtx"
+
+echo Downloading libdmtx DLL...
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%DLL_URL%' -OutFile '%DLL_FILE%' -UseBasicParsing}"
 if %errorlevel% neq 0 (
     echo Error: Failed to download libdmtx
+    echo Please try downloading manually from: %DLL_URL%
+    echo and place the file in the current directory as %DLL_FILE%
     pause
     exit /b 1
 )
 
-powershell -Command "& {Expand-Archive -Path 'libdmtx.zip' -DestinationPath 'temp_libdmtx' -Force}"
+echo Extracting libdmtx...
+if not exist "%DLL_FILE%" (
+    echo Error: %DLL_FILE% not found
+    pause
+    exit /b 1
+)
+
+powershell -Command "& {Expand-Archive -Path '%DLL_FILE%' -DestinationPath '%TEMP_DIR%' -Force}"
 if %errorlevel% neq 0 (
     echo Error: Failed to extract libdmtx
     pause
     exit /b 1
 )
 
-copy "temp_libdmtx\libdmtx-64.dll" "venv\Lib\site-packages\pylibdmtx\"
+echo Copying DLL file...
+if not exist "%TEMP_DIR%\libdmtx-64.dll" (
+    echo Error: libdmtx-64.dll not found in extracted files
+    pause
+    exit /b 1
+)
+
+copy "%TEMP_DIR%\libdmtx-64.dll" "venv\Lib\site-packages\pylibdmtx\"
 if %errorlevel% neq 0 (
     echo Error: Failed to copy DLL file
     pause
     exit /b 1
 )
 
-rmdir /s /q temp_libdmtx
-del libdmtx.zip
+echo Cleaning up...
+rmdir /s /q %TEMP_DIR%
+del %DLL_FILE%
 
 echo.
 echo Setup completed successfully!
